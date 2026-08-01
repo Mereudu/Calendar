@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EAM WO Calendar Planner - v1.0 Finale
 // @namespace    https://w.amazon.com/
-// @version      1.8.18
+// @version      1.8.19
 // @updateURL   https://raw.githubusercontent.com/Mereudu/Calendar/main/EAM_WO_Calendar_v1.0_Finale.user.js
 // @downloadURL https://raw.githubusercontent.com/Mereudu/Calendar/main/EAM_WO_Calendar_v1.0_Finale.user.js
 // @description  Versione finale veloce: calendario WO DVN3 con lettura diretta e parallela di Schedule Labor.
@@ -1912,7 +1912,7 @@ function buildPage(data) {
     return `<div class="wc" data-wo="${esc(num)}" data-cat="${esc(catId||'')}" data-day="${esc(dayKey||'')}" data-hours="${expectedHours(wo)||0}" data-tech="${esc((asgn||'').toUpperCase())}" onclick="cardClick(event,this)" ondblclick="oWO(${esc(JSON.stringify(String(num)))})" title="Click: seleziona/deseleziona \u00B7 Doppio click: apri in EAM\nWO: ${esc(num)}\n${esc(desc)}\nExpected Hours: ${esc(dur)}\nStatus: ${esc(stat)}\nEquip: ${esc(dispEq)}\nAssigned: ${esc(asgn||'Non assegnato')}">
 <div class="wct"><label class="wsel-l" onclick="event.stopPropagation()"><input type="checkbox" class="wsel" data-wo="${esc(num)}" onchange="toggleSel(this)"></label><span class="wn">WO: ${esc(num)}</span><span class="wd${dur==='—'?' miss':''}" title="WO Estimated Hours">${dur}</span></div>
 <div class="wx">${esc(desc)}</div>
-${sched!==null?`<div class="wh"><span>SCHED ${fmtHours(sched)}</span><span>REMAIN ${fmtHours(Math.max(0,(expectedHours(wo)||0)-sched))}</span>${actual!==null?`<span>ACT ${fmtHours(actual)}</span>`:''}</div>`:''}
+${sched!==null?`<div class="wh"><span>SCHED ${fmtHours(sched)}</span><span>REMAIN ${fmtHours(asgn?0:Math.max(0,(expectedHours(wo)||0)-sched))}</span>${actual!==null?`<span>ACT ${fmtHours(actual)}</span>`:''}</div>`:''}
 ${dispEq?`<div class="we">${esc(dispEq)}</div>`:''}${loc?`<div class="we">${esc(loc)}</div>`:''}
 <div class="wf">${asgn?`<span class="wb">${esc(asgn)}</span>`:''}${shft?`<span class="ws">${esc(shft)}</span>`:'<span class="ws wse">SHIFT?</span>'}<span class="wt" style="border-color:${sc};color:${sc}">${esc(statDisp)}${type?' - '+esc(type):''}</span></div>
 </div>`;
@@ -1960,7 +1960,7 @@ ${tot===0?`<div class="se">Nessun WO di tipo ${esc(cat.label)} questa settimana.
     <div class="kpis">
       <div class="kpi"><span>Expected Hours</span><strong>${fmtHours(totalHours)}</strong><small>${tot} work orders</small></div>
       <div class="kpi"><span>Schedule Labor</span><strong>${scheduledKnown?fmtHours(scheduledTotal):'—'}</strong><small>${scheduledKnown?`${scheduledKnown}/${tot} WO con dato`:'sincronizzazione non disponibile'}</small></div>
-      <div class="kpi${(scheduledKnown?Math.max(0,totalHours-scheduledTotal):unassignedHours)>0?' warn':''}"><span>Da pianificare</span><strong>${scheduledKnown?fmtHours(Math.max(0,totalHours-scheduledTotal)):fmtHours(unassignedHours)}</strong><small>${scheduledKnown?'Expected meno Scheduled':`${unassignedCount} WO senza tecnico`}</small></div>
+      <div class="kpi${unassignedHours>0?' warn':''}"><span>Da pianificare</span><strong>${fmtHours(unassignedHours)}</strong><small>${unassignedCount} WO senza tecnico assegnato</small></div>
       <div class="kpi ${missingHours?'risk':''}"><span>Dati incompleti</span><strong>${missingHours}</strong><small>WO senza Expected Hours</small></div>
     </div>
     <div class="ops-grid"><div><h3>Carico previsto per giorno</h3><div class="day-load">${dayCapacity}</div></div>
