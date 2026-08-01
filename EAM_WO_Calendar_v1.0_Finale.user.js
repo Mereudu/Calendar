@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EAM WO Calendar Planner - v1.0 Finale
 // @namespace    https://w.amazon.com/
-// @version      1.8.20
+// @version      1.8.21
 // @updateURL   https://raw.githubusercontent.com/Mereudu/Calendar/main/EAM_WO_Calendar_v1.0_Finale.user.js
 // @downloadURL https://raw.githubusercontent.com/Mereudu/Calendar/main/EAM_WO_Calendar_v1.0_Finale.user.js
 // @description  Versione finale veloce: calendario WO DVN3 con lettura diretta e parallela di Schedule Labor.
@@ -766,6 +766,9 @@ async function openWoRecord(woNum) {
 
   for(let attempt=1;attempt<=2;attempt++){
     if(await tryFromActiveGrid(attempt)) return true;
+    // Il double-click puo' aver aperto il WO DOPO il timeout di waitForRecordMatch.
+    // Ricontrolla prima di riaprire: evita doppia apertura (freeze EAM + conflitti concorrenza).
+    for(let w=0;w<1500;w+=250){ await delay(250); if(currentRecordMatches(wanted)) return true; }
     if(attempt<2){
       await returnToListView(false);
       await delay(700);
@@ -1436,8 +1439,20 @@ async function assignWo(woNum, techCode) {
 
   // Attende e verifica: rilegge il campo; successo se ora vale il codice impostato.
   let after=before;
+  const reConflict=/(modified by another|reload the record|modificato da un altro|not valid|non valido)/i;
   for(let waited=0;waited<6000;waited+=300){
     await delay(300);
+    // Scan dialog EAM: se compare "modified by another user" o errore, clicca OK e prosegui la verifica.
+    // Il valore potrebbe gia' essere salvato da un tentativo precedente (falso allarme).
+    try{
+      const dlgs=scanEamDialogs();
+      for(const d of dlgs){
+        if(reConflict.test(d.text||'')){
+          const ok=(d.buttons||[]).find(b=>btnMatches(b,/^(ok|chiudi|close)$/i));
+          if(ok) clickDialogBtn(ok);
+        }
+      }
+    }catch(e){}
     const again=findAssignedField();
     if(again){ after=String(again.field.getValue?.()||'').trim(); if(after.toUpperCase()===code) break; }
   }
@@ -1695,7 +1710,7 @@ async function moveWo(woNum, targetDayIso, assignCode, deferSave){
   // AJAX idle. NON usiamo isDirty come gate: sui record con campi Activity protetti
   // resta dirty=true anche dopo un save riuscito, facendo sprecare ~10s per WO.
   let after=null, dialogText=null, errored=false, confirmedContinue=false, sawDialog=false;
-  const reErr=/(must be later than or equal|must be greater|must be later|deve essere|not valid|non valido)/i;
+  const reErr=/(must be later than or equal|must be greater|must be later|deve essere|not valid|non valido|modified by another|reload the record|modificato da un altro)/i;
   const okRe=/^(ok|chiudi|close)$/i;
   // Qualsiasi bottone di conferma/prosecuzione (non solo "Continue"): il cambio di
   // assignedto puo' aprire dialog con testi diversi che prima venivano ignorati,
