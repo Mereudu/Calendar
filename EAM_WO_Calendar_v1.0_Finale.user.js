@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EAM WO Calendar Planner - v1.0 Finale
 // @namespace    https://w.amazon.com/
-// @version      1.8.21
+// @version      1.8.22
 // @updateURL   https://raw.githubusercontent.com/Mereudu/Calendar/main/EAM_WO_Calendar_v1.0_Finale.user.js
 // @downloadURL https://raw.githubusercontent.com/Mereudu/Calendar/main/EAM_WO_Calendar_v1.0_Finale.user.js
 // @description  Versione finale veloce: calendario WO DVN3 con lettura diretta e parallela di Schedule Labor.
@@ -17,6 +17,7 @@
 
 (() => {
 'use strict';
+console.log('%c[WOCal] AUTO-UPDATE TEST v1.8.22 caricata','color:#0a0;font-weight:bold;font-size:14px');
 
 const CFG = {
   baseUrl:         'https://eu1.eam.hxgnsmartcloud.com/web/base/',
