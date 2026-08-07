@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         EAM WO Calendar Planner - v1.0 Finale
 // @namespace    https://w.amazon.com/
-// @version      1.8.23
+// @version      1.9.1
 // @updateURL   https://raw.githubusercontent.com/Mereudu/Calendar/main/EAM_WO_Calendar_v1.0_Finale.user.js
 // @downloadURL https://raw.githubusercontent.com/Mereudu/Calendar/main/EAM_WO_Calendar_v1.0_Finale.user.js
 // @description  Versione finale veloce: calendario WO DVN3 con lettura diretta e parallela di Schedule Labor.
@@ -17,7 +17,7 @@
 
 (() => {
 'use strict';
-console.log('%c[WOCal] AUTO-UPDATE TEST v1.8.23 caricata (auto-update silenzioso OK)','color:#0a0;font-weight:bold;font-size:14px');
+console.log('%c[WOCal] v1.9.1 caricata','color:#0a0;font-weight:bold;font-size:14px');
 
 const CFG = {
   baseUrl:         'https://eu1.eam.hxgnsmartcloud.com/web/base/',
@@ -423,18 +423,22 @@ async function fetchWOs(startD, endD, org, assigned) {
   const { ext:targetExt, win:targetWin }=target;
 
   // STEP 3 — Pulisci campi e imposta filtri data settimana
-  sendStatus('Impostando filtri...', `Start >= ${toEam(startD)} (settimana ${toEam(startD)} - ${toEam(endD)})`);
+  sendStatus('Impostando filtri...', `Settimana ${toEam(startD)} - ${toEam(endD)} (start <= fine E end >= inizio)`);
   clearExtField(targetExt,['ff_schedstartdate','ff_startdate']);
   clearExtField(targetExt,['ff_schedenddate','ff_enddate']);
   clearExtField(targetExt,'ff_workordernum');
   clearExtField(targetExt,'ff_description');
   clearExtField(targetExt,'ff_organization');
   await delay(100);
-  // Filtro settimana: start>=inizio E end<=fine settimana (esattamente 7 giorni, nessun buffer).
-  // Il moveWo (v1.8.10) impone MAX_SPAN_DAYS=1, quindi un WO spostato con questo tool non avra' mai
-  // end oltre la fine settimana salvo il caso Start=Domenica->End=Lunedi succ. (accettato dall'utente).
-  setExtField(targetExt,['ff_schedstartdate','ff_startdate'],toEam(startD), OP_GTE);
-  setExtField(targetExt,['ff_schedenddate','ff_enddate'],  toEam(endD),   OP_LTE);
+  // Filtro settimana = query di SOVRAPPOSIZIONE (v1.9.0). Prende i WO che iniziano entro la
+  // fine settimana E finiscono dopo l'inizio settimana. Cosi' un WO che inizia nella settimana
+  // ma finisce dopo (es. PM di 3 giorni dal giovedi) non viene piu' tagliato dal SERVER, che era
+  // il bug del vecchio bound "schedenddate <= sabato".
+  // Vincolo EAM: un solo operatore per campo filtro, quindi i due bound stanno su campi diversi.
+  // La query e' limitata su entrambi i lati (niente futuro illimitato -> la paginazione resta corta).
+  // Il backlog che questa query tira dentro (end date spinta avanti) viene scartato in STEP 6.5.
+  setExtField(targetExt,['ff_schedstartdate','ff_startdate'],toEam(endD),   OP_LTE);
+  setExtField(targetExt,['ff_schedenddate','ff_enddate'],    toEam(startD), OP_GTE);
   if (org) {
     const orgApplied=setExtField(targetExt,'ff_organization',org,String(org).toUpperCase()==='DVN3'?OP_EQ:OP_CON);
     // Fail closed: non eseguire mai una ricerca non filtrata se il campo Organization manca.
@@ -624,6 +628,23 @@ async function fetchWOs(startD, endD, org, assigned) {
     records.push(...byWo.values());
     console.log('[WOCal] ✓ Totale finale:',records.length,'| passaggi UI:',steps,'| stop inattivi:',stagnant);
   }
+
+  // STEP 6.5 — Filtro settimana lato CLIENT sulla sola start date (v1.9.0).
+  // La posizione della card in griglia dipende solo dalla start date, quindi un WO che inizia
+  // fuori dai 7 giorni non ha colonna: va scartato qui, non mostrato altrove. Serve perche' la
+  // query di sovrapposizione di STEP 3 tira dentro anche il backlog aperto con end date lontana.
+  const wkFrom=new Date(startD.getFullYear(),startD.getMonth(),startD.getDate()).getTime();
+  const wkTo  =new Date(endD.getFullYear(),endD.getMonth(),endD.getDate()).getTime();
+  const inWeek=[], outWeek=[];
+  for (const w of records) {
+    const wd=fromEam(w[CFG.f.start]);
+    const wt=wd?new Date(wd.getFullYear(),wd.getMonth(),wd.getDate()).getTime():null;
+    if (wt!==null && wt>=wkFrom && wt<=wkTo) inWeek.push(w); else outWeek.push(w);
+  }
+  if (outWeek.length) console.log('[WOCal] Fuori settimana, scartati:', outWeek.length,
+    outWeek.map(w=>`${w[CFG.f.num]} ${w[CFG.f.start]}\u2192${w[CFG.f.end]}`));
+  console.log('[WOCal] \u2713 In settimana:', inWeek.length, 'su', records.length, 'letti dal server');
+  records.length=0; records.push(...inWeek);
 
   // STEP 7 — Filtra per tecnico lato client
   if (assigned) {
@@ -1459,7 +1480,7 @@ async function assignWo(woNum, techCode) {
   }
   const ok=after.toUpperCase()===code;
   try{ await returnToListView(); }catch(_){}
-  return ok?{ok:true,wo:num,before,after,exec:execResult,safety:safetyResult,sched:slResult}:{ok:false,wo:num,error:'save_not_confirmed',before,after,set:code,exec:execResult,safety:safetyResult,sched:slResult};
+  return ok?{ok:true,wo:num,before,after,exec:execResult,safety:safetyResult}:{ok:false,wo:num,error:'save_not_confirmed',before,after,set:code,exec:execResult,safety:safetyResult};
 }
 
 // Standalone: riempie WO Execution (udfchar13) SOLO se vuoto, con codice per categoria (fallback EXMW).
